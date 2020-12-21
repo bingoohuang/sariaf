@@ -93,3 +93,18 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8181", router))
 }
 ```
+
+## Giant shoulders
+
+1. [julienschmidt/httprouter](https://github.com/julienschmidt/httprouter)
+1. [gorilla/mux](https://github.com/gorilla/mux)
+1. [benhoyt/go-routing](https://github.com/benhoyt/go-routing)
+1. [fasthttp/router](https://github.com/fasthttp/router)
+1. [go-chi/chi](https://github.com/go-chi/chi)
+1. [dimfeld/httptreemux](https://github.com/dimfeld/httptreemux)
+1. [go-ozzo/ozzo-routing](https://github.com/go-ozzo/ozzo-routing)
+1. [gocraft/web](https://github.com/gocraft/web)
+1. [aquasecurity/lmdrouter](https://github.com/aquasecurity/lmdrouter)
+1. [ujiajun/gorouter](https://github.com/xujiajun/gorouter)
+1. [husobee/vestigo](https://github.com/husobee/vestigo)
+1. [kataras/muxie](https://github.com/kataras/muxie)
