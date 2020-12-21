@@ -46,6 +46,7 @@ type (
 		Router   *Router
 	}
 
+	// RouterContext defines the router matching context.
 	RouterContext struct {
 		Params RouterParams
 		Option *RouterOption
@@ -65,21 +66,15 @@ func Tag(tag interface{}) RouterOptionFn {
 }
 
 // add method adds a new path to the trie.
-func (n *Node) add(path string, handler http.HandlerFunc, r *Router, option *RouterOption) error {
+func (n *Node) add(path string, h http.HandlerFunc, r *Router, option *RouterOption) error {
 	current := n
 	trimmed := strings.TrimPrefix(path, "/")
 	slice := strings.Split(trimmed, "/")
 	duplicate := true
-	stars := 0
 	starPrev := false
-
-	for _, k := range slice {
-		if len(k) > 1 && k[0] == '*' {
-			stars++
-		}
-		if stars > 1 {
-			return fmt.Errorf("router pattern invalid, only one *abc allowed: %w", ErrRouterSyntax)
-		}
+	stars, err := n.countStars(slice)
+	if err != nil {
+		return err
 	}
 
 	for _, k := range slice {
@@ -120,20 +115,34 @@ func (n *Node) add(path string, handler http.HandlerFunc, r *Router, option *Rou
 		return fmt.Errorf("%s: %w", path, ErrRouterDuplicate)
 	}
 
-	current.Handler = handler
+	current.Handler = h
 	return nil
+}
+
+func (n *Node) countStars(slice []string) (int, error) {
+	stars := 0
+
+	for _, k := range slice {
+		if len(k) > 1 && k[0] == '*' {
+			stars++
+		}
+
+		if stars > 1 {
+			return 0, fmt.Errorf("router pattern invalid, only one *abc allowed: %w", ErrRouterSyntax)
+		}
+	}
+
+	return stars, nil
 }
 
 // find method match the request url path with a Node in trie.
 func (n *Node) find(path string) (*Node, RouterParams) {
-	params := make(RouterParams)
-	cur := n
 	trimmed := strings.TrimPrefix(path, "/")
 	slice := strings.Split(trimmed, "/")
+	params := make(RouterParams)
+	cur := n
 
 	for i, k := range slice {
-		var next *Node
-
 		next, ok := cur.Children[k]
 		if !ok {
 			if next, ok = cur.Children["*"]; !ok {
@@ -222,10 +231,10 @@ func New() *Router {
 func Noop(http.ResponseWriter, *http.Request) {}
 
 // ServeHTTP matches r.URL.Path with a stored route and calls handler for found Node.
-func (n *Node) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (n *Node) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if err := recover(); err != nil {
-			n.Router.panicHandler(w, req, err)
+			n.Router.panicHandler(w, r, err)
 		}
 	}()
 
@@ -236,7 +245,7 @@ func (n *Node) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// call the Node handler
-	h(w, req)
+	h(w, r)
 }
 
 // ServeHTTP matches r.URL.Path with a stored route and calls handler for found Node.
@@ -282,9 +291,9 @@ func (r *Router) Search(method, path string) (*Node, RouterParams) {
 }
 
 // Handle registers a new path with the given path and method.
-func (r *Router) Handle(method string, path string, handler http.HandlerFunc, optionFns ...RouterOptionFn) error {
-	if handler == nil {
-		handler = Noop
+func (r *Router) Handle(method string, path string, h http.HandlerFunc, optionFns ...RouterOptionFn) error {
+	if h == nil {
+		h = Noop
 	}
 
 	// check if for given method there is not any tie create a new one.
@@ -301,25 +310,17 @@ func (r *Router) Handle(method string, path string, handler http.HandlerFunc, op
 		f(routerOption)
 	}
 
-	return r.trees[method].add(path, handler, r, routerOption)
+	return r.trees[method].add(path, h, r, routerOption)
 }
 
 // Params returns params stored in the request.
-func Params(r *http.Request) RouterParams {
-	return fromContext(r.Context()).Params
-}
+func Params(r *http.Request) RouterParams { return fromContext(r.Context()).Params }
 
 // Param returns param with name stored in the request.
-func Param(r *http.Request, name string) string {
-	params := Params(r)
-
-	return params[name]
-}
+func Param(r *http.Request, name string) string { return Params(r)[name] }
 
 // Option returns router option with name stored in the request.
-func Option(r *http.Request) *RouterOption {
-	return fromContext(r.Context()).Option
-}
+func Option(r *http.Request) *RouterOption { return fromContext(r.Context()).Option }
 
 // Use append middlewares to the middleware stack.
 func (r *Router) Use(middlewares ...func(http.HandlerFunc) http.HandlerFunc) {
@@ -327,41 +328,37 @@ func (r *Router) Use(middlewares ...func(http.HandlerFunc) http.HandlerFunc) {
 }
 
 // GET will register a path with a handler for get requests.
-func (r *Router) GET(path string, handle http.HandlerFunc, optionFns ...RouterOptionFn) error {
-	return r.Handle(http.MethodGet, path, handle, optionFns...)
+func (r *Router) GET(path string, h http.HandlerFunc, optionFns ...RouterOptionFn) error {
+	return r.Handle(http.MethodGet, path, h, optionFns...)
 }
 
 // POST will register a path with a handler for post requests.
-func (r *Router) POST(path string, handle http.HandlerFunc, optionFns ...RouterOptionFn) error {
-	return r.Handle(http.MethodPost, path, handle, optionFns...)
+func (r *Router) POST(path string, h http.HandlerFunc, optionFns ...RouterOptionFn) error {
+	return r.Handle(http.MethodPost, path, h, optionFns...)
 }
 
 // DELETE will register a path with a handler for delete requests.
-func (r *Router) DELETE(path string, handle http.HandlerFunc, optionFns ...RouterOptionFn) error {
-	return r.Handle(http.MethodDelete, path, handle, optionFns...)
+func (r *Router) DELETE(path string, h http.HandlerFunc, optionFns ...RouterOptionFn) error {
+	return r.Handle(http.MethodDelete, path, h, optionFns...)
 }
 
 // PUT will register a path with a handler for put requests.
-func (r *Router) PUT(path string, handle http.HandlerFunc, optionFns ...RouterOptionFn) error {
-	return r.Handle(http.MethodPut, path, handle, optionFns...)
+func (r *Router) PUT(path string, h http.HandlerFunc, optionFns ...RouterOptionFn) error {
+	return r.Handle(http.MethodPut, path, h, optionFns...)
 }
 
 // PATCH will register a path with a handler for patch requests.
-func (r *Router) PATCH(path string, handle http.HandlerFunc, optionFns ...RouterOptionFn) error {
-	return r.Handle(http.MethodPatch, path, handle, optionFns...)
+func (r *Router) PATCH(path string, h http.HandlerFunc, optionFns ...RouterOptionFn) error {
+	return r.Handle(http.MethodPatch, path, h, optionFns...)
 }
 
 // HEAD will register a path with a handler for head requests.
-func (r *Router) HEAD(path string, handle http.HandlerFunc, optionFns ...RouterOptionFn) error {
-	return r.Handle(http.MethodHead, path, handle, optionFns...)
+func (r *Router) HEAD(path string, h http.HandlerFunc, optionFns ...RouterOptionFn) error {
+	return r.Handle(http.MethodHead, path, h, optionFns...)
 }
 
-// SetNotFound will register a handler for when no matching route is found
-func (r *Router) SetNotFound(handle http.HandlerFunc) {
-	r.notFound = handle
-}
+// SetNotFound will register a handler for when no matching route is found.
+func (r *Router) SetNotFound(h http.HandlerFunc) { r.notFound = h }
 
-// SetPanicHandler will register a handler for handling panics
-func (r *Router) SetPanicHandler(handle PanicHandlerType) {
-	r.panicHandler = handle
-}
+// SetPanicHandler will register a handler for handling panics.
+func (r *Router) SetPanicHandler(h PanicHandlerType) { r.panicHandler = h }
