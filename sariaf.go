@@ -352,6 +352,11 @@ func (r *Router) PATCH(path string, h http.HandlerFunc, optionFns ...RouterOptio
 	return r.Handle(http.MethodPatch, path, h, optionFns...)
 }
 
+// ANY registers the handler function for the given pattern.
+func (r *Router) ANY(pattern string, handler http.HandlerFunc) error {
+	return r.Handle(MethodAny, pattern, handler)
+}
+
 // HEAD will register a path with a handler for head requests.
 func (r *Router) HEAD(path string, h http.HandlerFunc, optionFns ...RouterOptionFn) error {
 	return r.Handle(http.MethodHead, path, h, optionFns...)

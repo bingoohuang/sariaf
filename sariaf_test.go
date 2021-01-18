@@ -42,7 +42,7 @@ func TestExample(t *testing.T) {
 	})
 	r.GET("/error", func(w http.ResponseWriter, r *http.Request) { panic("Some Error Message") })
 
-	r.GET("/abc/efg", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("GET: /abc/efg")) })
+	r.ANY("/abc/efg", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("GET: /abc/efg")) })
 
 	l, _ := net.Listen("tcp", ":0")
 	port := l.Addr().(*net.TCPAddr).Port
